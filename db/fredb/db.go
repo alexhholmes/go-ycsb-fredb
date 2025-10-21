@@ -189,7 +189,11 @@ func (db *freDB) Update(_ context.Context, table string, key string, values map[
 			return fmt.Errorf("key not found: %s.%s", table, key)
 		}
 
-		data, err := db.r.Decode(value, nil)
+		// Make a copy since the value may reference internal storage
+		valueCopy := make([]byte, len(value))
+		copy(valueCopy, value)
+
+		data, err := db.r.Decode(valueCopy, nil)
 		if err != nil {
 			return err
 		}
@@ -208,7 +212,11 @@ func (db *freDB) Update(_ context.Context, table string, key string, values map[
 			return err
 		}
 
-		return bucket.Put([]byte(key), buf)
+		// Make a copy since fredb may not copy the buffer immediately
+		dataBuf := make([]byte, len(buf))
+		copy(dataBuf, buf)
+
+		return bucket.Put([]byte(key), dataBuf)
 	})
 	return err
 }
@@ -226,12 +234,17 @@ func (db *freDB) BatchUpdate(_ context.Context, table string, keys []string, val
 		}()
 
 		for i, key := range keys {
+			buf = buf[:0]
 			buf, err = db.r.Encode(buf, values[i])
 			if err != nil {
 				return err
 			}
 
-			err = bucket.Put([]byte(key), buf)
+			// Make a copy since fredb may not copy the buffer immediately
+			data := make([]byte, len(buf))
+			copy(data, buf)
+
+			err = bucket.Put([]byte(key), data)
 			if err != nil {
 				return err
 			}
@@ -277,12 +290,17 @@ func (db *freDB) BatchInsert(_ context.Context, table string, keys []string, val
 		}()
 
 		for i, key := range keys {
+			buf = buf[:0]
 			buf, err = db.r.Encode(buf, values[i])
 			if err != nil {
 				return err
 			}
 
-			err = bucket.Put([]byte(key), buf)
+			// Make a copy since fredb may not copy the buffer immediately
+			data := make([]byte, len(buf))
+			copy(data, buf)
+
+			err = bucket.Put([]byte(key), data)
 			if err != nil {
 				return err
 			}
@@ -303,6 +321,24 @@ func (db *freDB) Delete(_ context.Context, table string, key string) error {
 		err := bucket.Delete([]byte(key))
 		if err != nil {
 			return err
+		}
+
+		return nil
+	})
+	return err
+}
+
+func (db *freDB) BatchDelete(_ context.Context, table string, keys []string) error {
+	err := db.db.Update(func(tx *fredb.Tx) error {
+		bucket := tx.Bucket([]byte(table))
+		if bucket == nil {
+			return nil
+		}
+
+		for _, key := range keys {
+			if err := bucket.Delete([]byte(key)); err != nil {
+				return err
+			}
 		}
 
 		return nil
