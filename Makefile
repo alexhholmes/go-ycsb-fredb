@@ -19,6 +19,9 @@ ifndef CROSS_COMPILE
 
 ifeq ($(SQLITE_CHECK), 0)
 	TAGS += libsqlite3
+	CGO_CFLAGS := "${CGO_CFLAGS} -I/opt/homebrew/opt/sqlite/include"
+	CGO_LDFLAGS := "${CGO_LDFLAGS} -L/opt/homebrew/opt/sqlite/lib"
+	CGO_FLAGS += CGO_CFLAGS=$(CGO_CFLAGS) CGO_LDFLAGS=$(CGO_LDFLAGS)
 endif
 
 ifeq ($(ROCKSDB_CHECK), 0)
