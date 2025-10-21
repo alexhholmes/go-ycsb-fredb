@@ -125,6 +125,33 @@ func (db *freDB) Read(_ context.Context, table string, key string, fields []stri
 	return m, err
 }
 
+func (db *freDB) BatchRead(_ context.Context, table string, keys []string, fields []string) ([]map[string][]byte, error) {
+	var m []map[string][]byte
+	err := db.db.View(func(tx *fredb.Tx) error {
+		bucket := tx.Bucket([]byte(table))
+		if bucket == nil {
+			return fmt.Errorf("table not found: %s", table)
+		}
+
+		for _, key := range keys {
+			row := bucket.Get([]byte(key))
+			if row == nil {
+				return fmt.Errorf("key not found: %s.%s", table, key)
+			}
+
+			e, err := db.r.Decode(row, fields)
+			if err != nil {
+				return err
+			}
+
+			m = append(m, e)
+		}
+
+		return nil
+	})
+	return m, err
+}
+
 func (db *freDB) Scan(_ context.Context, table string, startKey string, count int, fields []string) ([]map[string][]byte, error) {
 	res := make([]map[string][]byte, count)
 	err := db.db.View(func(tx *fredb.Tx) error {
@@ -186,6 +213,35 @@ func (db *freDB) Update(_ context.Context, table string, key string, values map[
 	return err
 }
 
+func (db *freDB) BatchUpdate(_ context.Context, table string, keys []string, values []map[string][]byte) error {
+	err := db.db.Update(func(tx *fredb.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte(table))
+		if err != nil {
+			return err
+		}
+
+		buf := db.bufPool.Get()
+		defer func() {
+			db.bufPool.Put(buf)
+		}()
+
+		for i, key := range keys {
+			buf, err = db.r.Encode(buf, values[i])
+			if err != nil {
+				return err
+			}
+
+			err = bucket.Put([]byte(key), buf)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+	return err
+}
+
 func (db *freDB) Insert(_ context.Context, table string, key string, values map[string][]byte) error {
 	err := db.db.Update(func(tx *fredb.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte(table))
@@ -204,6 +260,35 @@ func (db *freDB) Insert(_ context.Context, table string, key string, values map[
 		}
 
 		return bucket.Put([]byte(key), buf)
+	})
+	return err
+}
+
+func (db *freDB) BatchInsert(_ context.Context, table string, keys []string, values []map[string][]byte) error {
+	err := db.db.Update(func(tx *fredb.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte(table))
+		if err != nil {
+			return err
+		}
+
+		buf := db.bufPool.Get()
+		defer func() {
+			db.bufPool.Put(buf)
+		}()
+
+		for i, key := range keys {
+			buf, err = db.r.Encode(buf, values[i])
+			if err != nil {
+				return err
+			}
+
+			err = bucket.Put([]byte(key), buf)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 	return err
 }
