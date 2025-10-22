@@ -208,7 +208,7 @@ func (db *freDB) Update(_ context.Context, table string, key string, values map[
 			return err
 		}
 
-		return bucket.Put([]byte(key), buf)
+		return bucket.Set([]byte(key), buf)
 	})
 	return err
 }
@@ -231,7 +231,7 @@ func (db *freDB) BatchUpdate(_ context.Context, table string, keys []string, val
 				return err
 			}
 
-			err = bucket.Put([]byte(key), buf)
+			err = bucket.Set([]byte(key), buf)
 			if err != nil {
 				return err
 			}
@@ -259,7 +259,7 @@ func (db *freDB) Insert(_ context.Context, table string, key string, values map[
 			return err
 		}
 
-		return bucket.Put([]byte(key), buf)
+		return bucket.Set([]byte(key), buf)
 	})
 	return err
 }
@@ -282,7 +282,7 @@ func (db *freDB) BatchInsert(_ context.Context, table string, keys []string, val
 				return err
 			}
 
-			err = bucket.Put([]byte(key), buf)
+			err = bucket.Set([]byte(key), buf)
 			if err != nil {
 				return err
 			}
